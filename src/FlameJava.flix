@@ -64,18 +64,17 @@ mod Flame.Java {
 
     /// Handle request with Logger effect
     def handleRequest(exchange: HttpExchange, ctx: Context, routes: List[Route[ef]]): Unit \ { IO, Logger, ef } =
-        run {
+        Logger.logRequest(ctx);
+        let response = run {
             run {
-                Logger.logRequest(ctx);
                 Flame.handleRequestWithMiddleware(ctx, routes)
             } with handler FlameHandler {
                 def readBody(_, resume) = {
                     let b = readBodyImpl(exchange);
                     resume(b)
                 }
-                def sendResponse(response, resume) = {
-                    Logger.logResponse(ctx, response);
-                    sendResponseImpl(exchange, response);
+                def sendResponse(r, resume) = {
+                    sendResponseImpl(exchange, r);
                     resume()
                 }
                 def send404(_, resume) = {
@@ -86,12 +85,14 @@ mod Flame.Java {
         } with handler MiddlewareHook {
             def onRequest(_, resume) = resume()
             def onResponse(_, _, resume) = resume()
-        }
+        };
+        Logger.logResponse(ctx, response)
 
     /// Run HTTP server
     def runHttpServer(a: AppData[ef]): Unit \ { IO, Chan, NonDet, Logger, ef } = unchecked_cast({
         let appPort = Flame.getDataPort(a);
         let routes = Flame.getDataRoutes(a);
+        let loggerEnabled = Flame.dataHasLogger(a);
         let server = HttpServer.create(new InetSocketAddress(appPort), 0);
 
         server.createContext("/", new HttpHandler {
@@ -100,7 +101,11 @@ mod Flame.Java {
                     let path = exchange.getRequestURI().getPath();
                     let method = exchange.getRequestMethod();
                     let ctx = Flame.context(method, path, 0i64);
-                    handleRequest(exchange, ctx, routes)
+                    if (loggerEnabled) {
+                        Flame.withLoggerHandler(_ -> handleRequest(exchange, ctx, routes))
+                    } else {
+                        Flame.withNoOpLogger(_ -> handleRequest(exchange, ctx, routes))
+                    }
                 } as _ \ IO)
         });
 

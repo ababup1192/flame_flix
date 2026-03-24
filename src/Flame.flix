@@ -352,7 +352,7 @@ mod Flame {
         List.memberOf("logger", getDataMiddlewares(d))
 
     /// Handle request with middleware hooks
-    pub def handleRequestWithMiddleware(ctx: Context, routes: List[Route[ef]]): Unit \ { FlameHandler, MiddlewareHook, ef } =
+    pub def handleRequestWithMiddleware(ctx: Context, routes: List[Route[ef]]): Response \ { FlameHandler, MiddlewareHook, ef } =
         MiddlewareHook.onRequest(ctx);
         let method = getCtxMethod(ctx);
         let path = getCtxPath(ctx);
@@ -379,6 +379,7 @@ mod Flame {
                 FlameHandler.sendResponse(r);
                 r
         };
-        MiddlewareHook.onResponse(ctx, response)
+        MiddlewareHook.onResponse(ctx, response);
+        response
 
 }
