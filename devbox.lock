@@ -1,0 +1,57 @@
+{
+  "lockfile_version": "1",
+  "packages": {
+    "flix@latest": {
+      "last_modified": "2026-03-14T08:29:25Z",
+      "resolved": "github:NixOS/nixpkgs/f82ce7af0b79ac154b12e27ed800aeb97413723c#flix",
+      "source": "devbox-search",
+      "version": "0.69.1",
+      "systems": {
+        "aarch64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/cjnpl8g2c1f2nygrj1v690im14z9f386-flix-0.69.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/cjnpl8g2c1f2nygrj1v690im14z9f386-flix-0.69.1"
+        },
+        "aarch64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/nilimrcslyk3hf43s42wzvbdzvfwrysa-flix-0.69.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/nilimrcslyk3hf43s42wzvbdzvfwrysa-flix-0.69.1"
+        },
+        "x86_64-darwin": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/k2cwi4n3kxnal2lmsbky7g2ya348xvdz-flix-0.69.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/k2cwi4n3kxnal2lmsbky7g2ya348xvdz-flix-0.69.1"
+        },
+        "x86_64-linux": {
+          "outputs": [
+            {
+              "name": "out",
+              "path": "/nix/store/wvlq5mvsf97b9w91v1h3n3q0100z5cin-flix-0.69.1",
+              "default": true
+            }
+          ],
+          "store_path": "/nix/store/wvlq5mvsf97b9w91v1h3n3q0100z5cin-flix-0.69.1"
+        }
+      }
+    },
+    "github:NixOS/nixpkgs/nixpkgs-unstable": {
+      "last_modified": "2026-03-02T02:42:23Z",
+      "resolved": "github:NixOS/nixpkgs/93178f6a00c22fcdee1c6f5f9ab92f2072072ea9?lastModified=1772419343"
+    }
+  }
+}
