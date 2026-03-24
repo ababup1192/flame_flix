@@ -144,8 +144,8 @@ def testPostParamRoute01(): Unit \ Assert =
 // Calling fire() in NoServer state causes a compile error
 
 // Mock server (exits immediately)
-def mockServerImpl(_data: Flame.AppData[{}]): Unit \ { IO, Chan, NonDet } =
-    unchecked_cast(() as _ \ { IO, Chan, NonDet })
+def mockServerImpl(_data: Flame.AppData[{}]): Unit \ { IO, Chan, NonDet, Flame.Logger } =
+    unchecked_cast(() as _ \ { IO, Chan, NonDet, Flame.Logger })
 
 // Test: server() transitions to WithServer state
 @Test

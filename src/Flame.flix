@@ -39,7 +39,7 @@ mod Flame {
     }
 
     /// Server implementation type
-    pub type alias ServerImpl[ef: Eff] = AppData[ef] -> Unit \ { IO, Chan, NonDet, ef }
+    pub type alias ServerImpl[ef: Eff] = AppData[ef] -> Unit \ { IO, Chan, NonDet, Logger, ef }
 
     /// App with phantom type for state tracking
     pub enum App[_s: Type, ef: Eff] {
@@ -86,6 +86,12 @@ mod Flame {
     pub eff MiddlewareHook {
         def onRequest(ctx: Context): Unit
         def onResponse(ctx: Context, response: Response): Unit
+    }
+
+    /// Effect for logging
+    pub eff Logger {
+        def logRequest(ctx: Context): Unit
+        def logResponse(ctx: Context, response: Response): Unit
     }
 
     /// Create a new App (NoServer state)
@@ -152,7 +158,7 @@ mod Flame {
     }
 
     def upcastServerImpl(srv: Option[ServerImpl[ef1]]): Option[ServerImpl[ef1 + ef2]] =
-        Option.map(impl -> data -> unchecked_cast(impl(upcastAppDataDown(data)) as _ \ { IO, Chan, NonDet, ef1, ef2 }), srv)
+        Option.map(impl -> data -> unchecked_cast(impl(upcastAppDataDown(data)) as _ \ { IO, Chan, NonDet, Logger, ef1, ef2 }), srv)
 
     def upcastAppDataDown(data: AppData[ef1 + ef2]): AppData[ef1] = match data {
         case AppData.AppData(p, routes, mws) =>
@@ -276,9 +282,43 @@ mod Flame {
                 FlameHandler.sendResponse(h(params, body))
         }
 
+    /// Run with actual logging
+    pub def withLoggerHandler(f: Unit -> Unit \ { IO, Logger, ef }): Unit \ { IO, ef } =
+        run {
+            f()
+        } with handler Logger {
+            def logRequest(ctx, resume) = {
+                let m = getCtxMethod(ctx);
+                let p = getCtxPath(ctx);
+                println("[${m}] ${p} --> Request");
+                resume()
+            }
+            def logResponse(ctx, response, resume) = {
+                let m = getCtxMethod(ctx);
+                let p = getCtxPath(ctx);
+                let Response.Response(contentType, _) = response;
+                println("[${m}] ${p} <-- ${contentType}");
+                resume()
+            }
+        }
+
+    /// Run without logging (no-op handler)
+    pub def withNoOpLogger(f: Unit -> Unit \ { Logger, ef }): Unit \ ef =
+        run {
+            f()
+        } with handler Logger {
+            def logRequest(_, resume) = resume()
+            def logResponse(_, _, resume) = resume()
+        }
+
     /// Start server (only available in WithServer state)
     pub def fire(a: App[WithServer, ef]): Unit \ { IO, Chan, NonDet, ef } = match a {
-        case App.App(data, Some(impl)) => impl(data)
+        case App.App(data, Some(impl)) =>
+            if (dataHasLogger(data)) {
+                withLoggerHandler(_ -> impl(data))
+            } else {
+                withNoOpLogger(_ -> impl(data))
+            }
         case App.App(_, None) => ()
     }
 

@@ -8,7 +8,6 @@ mod Flame.Java {
     import java.lang.Runnable
     import java.lang.Runtime
     import java.lang.Thread
-    import java.lang.System
     import java.io.InputStreamReader
     import java.io.BufferedReader
 
@@ -19,13 +18,12 @@ mod Flame.Java {
     use Flame.Context
     use Flame.FlameHandler
     use Flame.MiddlewareHook
+    use Flame.Logger
     use Flame.WithServer
 
     /// Set Java HttpServer (transitions to WithServer state)
     pub def javaServer(a: App[s, ef]): App[WithServer, ef] =
         Flame.server(runHttpServer, a)
-
-    def currentTimeNanos(): Int64 \ IO = System.nanoTime()
 
     def sendResponseImpl(exchange: HttpExchange, response: Response): Unit \ IO =
         let Response.Response(contentType, body) = response;
@@ -64,10 +62,11 @@ mod Flame.Java {
             StringBuilder.toString(sb)
         }
 
-    /// Handle request with logger middleware
-    def handleWithLogger(exchange: HttpExchange, ctx: Context, routes: List[Route[ef]]): Unit \ { IO, ef } =
+    /// Handle request with Logger effect
+    def handleRequest(exchange: HttpExchange, ctx: Context, routes: List[Route[ef]]): Unit \ { IO, Logger, ef } =
         run {
             run {
+                Logger.logRequest(ctx);
                 Flame.handleRequestWithMiddleware(ctx, routes)
             } with handler FlameHandler {
                 def readBody(_, resume) = {
@@ -75,44 +74,7 @@ mod Flame.Java {
                     resume(b)
                 }
                 def sendResponse(response, resume) = {
-                    sendResponseImpl(exchange, response);
-                    resume()
-                }
-                def send404(_, resume) = {
-                    send404Impl(exchange);
-                    resume()
-                }
-            }
-        } with handler MiddlewareHook {
-            def onRequest(reqCtx, resume) = {
-                let m = Flame.getCtxMethod(reqCtx);
-                let p = Flame.getCtxPath(reqCtx);
-                println("[${m}] ${p} --> Request");
-                resume()
-            }
-            def onResponse(reqCtx, response, resume) = {
-                let m = Flame.getCtxMethod(reqCtx);
-                let p = Flame.getCtxPath(reqCtx);
-                let endTime = currentTimeNanos();
-                let start = Flame.getCtxStartTime(reqCtx);
-                let durationMs = (endTime - start) / 1000000i64;
-                let Response.Response(contentType, _) = response;
-                println("[${m}] ${p} <-- ${contentType} (${durationMs}ms)");
-                resume()
-            }
-        }
-
-    /// Handle request without middleware
-    def handleWithoutMiddleware(exchange: HttpExchange, ctx: Context, routes: List[Route[ef]]): Unit \ { IO, ef } =
-        run {
-            run {
-                Flame.handleRequestWithMiddleware(ctx, routes)
-            } with handler FlameHandler {
-                def readBody(_, resume) = {
-                    let b = readBodyImpl(exchange);
-                    resume(b)
-                }
-                def sendResponse(response, resume) = {
+                    Logger.logResponse(ctx, response);
                     sendResponseImpl(exchange, response);
                     resume()
                 }
@@ -127,10 +89,9 @@ mod Flame.Java {
         }
 
     /// Run HTTP server
-    def runHttpServer(a: AppData[ef]): Unit \ { IO, Chan, NonDet, ef } = unchecked_cast({
+    def runHttpServer(a: AppData[ef]): Unit \ { IO, Chan, NonDet, Logger, ef } = unchecked_cast({
         let appPort = Flame.getDataPort(a);
         let routes = Flame.getDataRoutes(a);
-        let loggerEnabled = Flame.dataHasLogger(a);
         let server = HttpServer.create(new InetSocketAddress(appPort), 0);
 
         server.createContext("/", new HttpHandler {
@@ -138,13 +99,8 @@ mod Flame.Java {
                 unchecked_cast({
                     let path = exchange.getRequestURI().getPath();
                     let method = exchange.getRequestMethod();
-                    let startTime = currentTimeNanos();
-                    let ctx = Flame.context(method, path, startTime);
-                    if (loggerEnabled) {
-                        handleWithLogger(exchange, ctx, routes)
-                    } else {
-                        handleWithoutMiddleware(exchange, ctx, routes)
-                    }
+                    let ctx = Flame.context(method, path, 0i64);
+                    handleRequest(exchange, ctx, routes)
                 } as _ \ IO)
         });
 
@@ -166,6 +122,6 @@ mod Flame.Java {
         Channel.recv(rx);
         println("Server exiting gracefully");
         server.stop(0)
-    } as _ \ { IO, Chan, NonDet, ef })
+    } as _ \ { IO, Chan, NonDet, Logger, ef })
 
 }
