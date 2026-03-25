@@ -137,6 +137,9 @@ mod Flame {
     }
 
     // Effect upcasting helpers
+    // Effect upcasting helpers
+    // Flix does not support automatic effect row extension (ef1 -> ef1 + ef2),
+    // so we use unchecked_cast to widen effect types when composing handlers in pipelines.
 
     def upcastHandler0(h: Unit -> Response \ ef1): Unit -> Response \ { ef1, ef2 } =
         _ -> unchecked_cast(h() as _ \ { ef1, ef2 })
@@ -157,6 +160,7 @@ mod Flame {
         case Route.PostParam(p, h) => Route.PostParam(p, upcastHandler2(h))
     }
 
+    // Effect widening for ServerImpl (same reason as upcastHandler)
     def upcastServerImpl(srv: Option[ServerImpl[ef1]]): Option[ServerImpl[ef1 + ef2]] =
         Option.map(impl -> data -> unchecked_cast(impl(upcastAppDataDown(data)) as _ \ { IO, Chan, NonDet, Logger, ef1, ef2 }), srv)
 
@@ -165,6 +169,7 @@ mod Flame {
             AppData.AppData(p, List.map(r -> downcastRoute(r), routes), mws)
     }
 
+    // Effect narrowing for routes (inverse of upcasting, used when passing data to server impl)
     def downcastRoute(r: Route[ef1 + ef2]): Route[ef1] = match r {
         case Route.Get(p, h) => Route.Get(p, _ -> unchecked_cast(h() as _ \ ef1))
         case Route.Post(p, h) => Route.Post(p, x -> unchecked_cast(h(x) as _ \ ef1))

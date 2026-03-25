@@ -89,6 +89,9 @@ mod Flame.Java {
         Logger.logResponse(ctx, response)
 
     /// Run HTTP server
+    // unchecked_cast is required because Flix cannot unify the complex effect formula
+    // arising from Java interop calls (HttpServer, Thread, Runtime) with the declared effect.
+    // The actual effects are correct but Flix's effect inference produces redundant IO terms.
     def runHttpServer(a: AppData[ef]): Unit \ { IO, Chan, NonDet, Logger, ef } = unchecked_cast({
         let appPort = Flame.getDataPort(a);
         let routes = Flame.getDataRoutes(a);
@@ -96,17 +99,17 @@ mod Flame.Java {
         let server = HttpServer.create(new InetSocketAddress(appPort), 0);
 
         server.createContext("/", new HttpHandler {
-            def $handle(_this: HttpHandler, exchange: HttpExchange): Unit \ IO =
-                unchecked_cast({
-                    let path = exchange.getRequestURI().getPath();
-                    let method = exchange.getRequestMethod();
-                    let ctx = Flame.context(method, path, 0i64);
-                    if (loggerEnabled) {
-                        Flame.withLoggerHandler(_ -> handleRequest(exchange, ctx, routes))
-                    } else {
-                        Flame.withNoOpLogger(_ -> handleRequest(exchange, ctx, routes))
-                    }
-                } as _ \ IO)
+            // Logger handler must be applied here (not in fire) because $handle is a Java callback
+            // executed outside the effect handler scope established by fire.
+            def $handle(_this: HttpHandler, exchange: HttpExchange): Unit \ { IO, ef } =
+                let path = exchange.getRequestURI().getPath();
+                let method = exchange.getRequestMethod();
+                let ctx = Flame.context(method, path, 0i64);
+                if (loggerEnabled) {
+                    Flame.withLoggerHandler(_ -> handleRequest(exchange, ctx, routes))
+                } else {
+                    Flame.withNoOpLogger(_ -> handleRequest(exchange, ctx, routes))
+                }
         });
 
         server.start();
