@@ -316,6 +316,15 @@ mod Flame {
             def logResponse(_, _, resume) = resume()
         }
 
+    /// Apply appropriate Logger handler based on AppData configuration
+    /// This hides the logger-enabled check from the server implementation
+    pub def runWithLogger(data: AppData[ef], f: Unit -> Unit \ { IO, Logger, ef }): Unit \ { IO, ef } =
+        if (dataHasLogger(data)) {
+            withLoggerHandler(f)
+        } else {
+            withNoOpLogger(f)
+        }
+
     /// Start server (only available in WithServer state)
     pub def fire(a: App[WithServer, ef]): Unit \ { IO, Chan, NonDet, ef } = match a {
         case App.App(data, Some(impl)) =>

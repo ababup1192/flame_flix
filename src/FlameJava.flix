@@ -95,21 +95,17 @@ mod Flame.Java {
     def runHttpServer(a: AppData[ef]): Unit \ { IO, Chan, NonDet, Logger, ef } = unchecked_cast({
         let appPort = Flame.getDataPort(a);
         let routes = Flame.getDataRoutes(a);
-        let loggerEnabled = Flame.dataHasLogger(a);
         let server = HttpServer.create(new InetSocketAddress(appPort), 0);
 
         server.createContext("/", new HttpHandler {
             // Logger handler must be applied here (not in fire) because $handle is a Java callback
             // executed outside the effect handler scope established by fire.
+            // Flame.runWithLogger handles the logger-enabled check internally.
             def $handle(_this: HttpHandler, exchange: HttpExchange): Unit \ { IO, ef } =
                 let path = exchange.getRequestURI().getPath();
                 let method = exchange.getRequestMethod();
                 let ctx = Flame.context(method, path, 0i64);
-                if (loggerEnabled) {
-                    Flame.withLoggerHandler(_ -> handleRequest(exchange, ctx, routes))
-                } else {
-                    Flame.withNoOpLogger(_ -> handleRequest(exchange, ctx, routes))
-                }
+                Flame.runWithLogger(a, _ -> handleRequest(exchange, ctx, routes))
         });
 
         server.start();
