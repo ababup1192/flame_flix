@@ -107,7 +107,7 @@ mod Flame {
     /// Register GET route
     pub def get(pattern: Pattern, h: Unit -> Response \ ef1, a: App[s, ef2]): App[s, ef1 + ef2] = match a {
         case App.App(AppData.AppData(p, routes, mws), srv) =>
-            let newRoute: Route[ef1 + ef2] = Route.Get(pattern, upcastHandler0(h));
+            let newRoute: Route[ef1 + ef2] = Route.Get(pattern, upcastGetHandler(h));
             let newRoutes: List[Route[ef1 + ef2]] = newRoute :: upcastRoutes(routes);
             App.App(AppData.AppData(p, newRoutes, mws), upcastServerImpl(srv))
     }
@@ -115,7 +115,7 @@ mod Flame {
     /// Register POST route
     pub def post(pattern: Pattern, h: Body -> Response \ ef1, a: App[s, ef2]): App[s, ef1 + ef2] = match a {
         case App.App(AppData.AppData(p, routes, mws), srv) =>
-            let newRoute: Route[ef1 + ef2] = Route.Post(pattern, upcastHandler1(h));
+            let newRoute: Route[ef1 + ef2] = Route.Post(pattern, upcastBodyHandler(h));
             let newRoutes: List[Route[ef1 + ef2]] = newRoute :: upcastRoutes(routes);
             App.App(AppData.AppData(p, newRoutes, mws), upcastServerImpl(srv))
     }
@@ -123,7 +123,7 @@ mod Flame {
     /// Register GET route with URL parameters
     pub def getParam(pattern: Pattern, h: Params -> Response \ ef1, a: App[s, ef2]): App[s, ef1 + ef2] = match a {
         case App.App(AppData.AppData(p, routes, mws), srv) =>
-            let newRoute: Route[ef1 + ef2] = Route.GetParam(pattern, upcastHandler1(h));
+            let newRoute: Route[ef1 + ef2] = Route.GetParam(pattern, upcastBodyHandler(h));
             let newRoutes: List[Route[ef1 + ef2]] = newRoute :: upcastRoutes(routes);
             App.App(AppData.AppData(p, newRoutes, mws), upcastServerImpl(srv))
     }
@@ -131,33 +131,32 @@ mod Flame {
     /// Register POST route with URL parameters
     pub def postParam(pattern: Pattern, h: (Params, Body) -> Response \ ef1, a: App[s, ef2]): App[s, ef1 + ef2] = match a {
         case App.App(AppData.AppData(p, routes, mws), srv) =>
-            let newRoute: Route[ef1 + ef2] = Route.PostParam(pattern, upcastHandler2(h));
+            let newRoute: Route[ef1 + ef2] = Route.PostParam(pattern, upcastParamBodyHandler(h));
             let newRoutes: List[Route[ef1 + ef2]] = newRoute :: upcastRoutes(routes);
             App.App(AppData.AppData(p, newRoutes, mws), upcastServerImpl(srv))
     }
 
     // Effect upcasting helpers
-    // Effect upcasting helpers
     // Flix does not support automatic effect row extension (ef1 -> ef1 + ef2),
     // so we use unchecked_cast to widen effect types when composing handlers in pipelines.
 
-    def upcastHandler0(h: Unit -> Response \ ef1): Unit -> Response \ { ef1, ef2 } =
+    def upcastGetHandler(h: Unit -> Response \ ef1): Unit -> Response \ { ef1, ef2 } =
         _ -> unchecked_cast(h() as _ \ { ef1, ef2 })
 
-    def upcastHandler1(h: a -> Response \ ef1): a -> Response \ { ef1, ef2 } =
+    def upcastBodyHandler(h: a -> Response \ ef1): a -> Response \ { ef1, ef2 } =
         x -> unchecked_cast(h(x) as _ \ { ef1, ef2 })
 
-    def upcastHandler2(h: (a, b) -> Response \ ef1): (a, b) -> Response \ { ef1, ef2 } =
+    def upcastParamBodyHandler(h: (a, b) -> Response \ ef1): (a, b) -> Response \ { ef1, ef2 } =
         (x, y) -> unchecked_cast(h(x, y) as _ \ { ef1, ef2 })
 
     def upcastRoutes(routes: List[Route[ef1]]): List[Route[ef1 + ef2]] =
         List.map(r -> upcastRoute(r), routes)
 
     def upcastRoute(r: Route[ef1]): Route[ef1 + ef2] = match r {
-        case Route.Get(p, h) => Route.Get(p, upcastHandler0(h))
-        case Route.Post(p, h) => Route.Post(p, upcastHandler1(h))
-        case Route.GetParam(p, h) => Route.GetParam(p, upcastHandler1(h))
-        case Route.PostParam(p, h) => Route.PostParam(p, upcastHandler2(h))
+        case Route.Get(p, h) => Route.Get(p, upcastGetHandler(h))
+        case Route.Post(p, h) => Route.Post(p, upcastBodyHandler(h))
+        case Route.GetParam(p, h) => Route.GetParam(p, upcastBodyHandler(h))
+        case Route.PostParam(p, h) => Route.PostParam(p, upcastParamBodyHandler(h))
     }
 
     // Effect widening for ServerImpl (same reason as upcastHandler)
